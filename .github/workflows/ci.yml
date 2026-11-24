@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck 0.10.0
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 \
+            https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz \
+            -o /tmp/shellcheck.tar.xz
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          /tmp/shellcheck-v0.10.0/shellcheck --version
+
+      - name: ShellCheck
+        run: /tmp/shellcheck-v0.10.0/shellcheck deploy-dsh.sh tests/*.sh scripts/*.sh
+
+      - name: Syntax
+        run: |
+          bash -n deploy-dsh.sh
+          for f in tests/*.sh scripts/*.sh; do bash -n "$f"; done
+
+      - name: Tests
+        run: bash tests/run.sh
+
+      - name: Version command
+        run: test -n "$(bash deploy-dsh.sh version)"
+
+      - name: Package
+        run: bash scripts/package.sh
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-deploy-package
+          path: dist/*
+          if-no-files-found: error
